@@ -55,14 +55,47 @@ min="1" placeholder="例如：150" required>
 <p id="result"></p>
 </div>
 
+
 <script>
+const webhookUrl =
+  "https://zoe36875.app.n8n.cloud/webhook-test/meal-record";
+
 document.getElementById("mealForm")
-.addEventListener("submit", function(e) {
-e.preventDefault();
-document.getElementById("result")
-.textContent = "表單測試成功！尚未連接資料庫。";
-});
+  .addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const form = e.target;
+    const result = document.getElementById("result");
+
+    const data = {
+      restaurant: form.restaurant.value,
+      amount: Number(form.amount.value),
+      mealDate: form.mealDate.value
+    };
+
+    result.textContent = "正在傳送資料...";
+
+    try {
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain"
+        },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        throw new Error("HTTP " + response.status);
+      }
+
+      result.textContent = "資料已送出！";
+    } catch (error) {
+      result.textContent =
+        "傳送失敗：" + error.message;
+    }
+  });
 </script>
+
 </body>
 </html>
 
