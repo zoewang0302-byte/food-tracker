@@ -77,7 +77,19 @@ const webhookUrl =
 }
 
 initLiff();
+function getLineIdToken() {
+  if (!liff.isLoggedIn()) {
+    throw new Error("請先登入 LINE");
+  }
 
+  const idToken = liff.getIDToken();
+
+  if (!idToken) {
+    throw new Error("無法取得 LINE 身分權杖");
+  }
+
+  return idToken;
+}
 document.getElementById("mealForm")
   .addEventListener("submit", async function(e) {
     e.preventDefault();
@@ -85,11 +97,12 @@ document.getElementById("mealForm")
     const form = e.target;
     const result = document.getElementById("result");
 
-    const data = {
-      restaurant: form.restaurant.value,
-      amount: Number(form.amount.value),
-      mealDate: form.mealDate.value
-    };
+   const data = {
+  restaurant: form.restaurant.value,
+  amount: Number(form.amount.value),
+  mealDate: form.mealDate.value,
+  idToken: getLineIdToken()
+};
 
     result.textContent = "正在傳送資料...";
 
