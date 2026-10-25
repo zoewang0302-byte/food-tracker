@@ -55,10 +55,28 @@ min="1" placeholder="例如：150" required>
 <p id="result"></p>
 </div>
 
-
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script>
 const webhookUrl =
   "https://zoe36875.app.n8n.cloud/webhook-test/meal-record";
+  async function initLiff() {
+  try {
+    await liff.init({
+      liffId: "2012195207-0B05X0PU"
+    });
+
+    if (!liff.isLoggedIn()) {
+      liff.login();
+      return;
+    }
+
+    console.log("LIFF 登入成功");
+  } catch (error) {
+    console.error("LIFF 初始化失敗", error);
+  }
+}
+
+initLiff();
 
 document.getElementById("mealForm")
   .addEventListener("submit", async function(e) {
