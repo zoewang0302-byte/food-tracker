@@ -49,7 +49,7 @@ min="1" placeholder="例如：150" required>
 <label>用餐日期</label>
 <input type="date" name="mealDate" required>
 
-<button type="submit">儲存消費紀錄</button>
+<button type="submit" id="submitBtn">儲存消費紀錄</button>
 </form>
 
 <p id="result"></p>
@@ -105,6 +105,8 @@ document.getElementById("mealForm")
 };
 
     result.textContent = "正在傳送資料...";
+    const submitBtn = document.getElementById("submitBtn");
+submitBtn.disabled = true;
 
     try {
       const response = await fetch(webhookUrl, {
@@ -121,9 +123,11 @@ document.getElementById("mealForm")
 
       result.textContent = "資料已送出！";
     } catch (error) {
-      result.textContent =
-        "傳送失敗：" + error.message;
-    }
+  result.textContent =
+    "傳送失敗：" + error.message;
+} finally {
+  submitBtn.disabled = false;
+}
   });
 </script>
 
