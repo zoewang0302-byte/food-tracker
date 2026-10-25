@@ -1,114 +1,223 @@
+
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport"
-content="width=device-width, initial-scale=1">
-<title>美食消費紀錄</title>
-<style>
-body {
-font-family: Arial, sans-serif;
-background: #f5f7f5;
-padding: 24px;
-}
-.container {
-max-width: 420px;
-margin: 30px auto;
-background: white;
-padding: 24px;
-border-radius: 16px;
-}
-input, button {
-width: 100%;
-padding: 12px;
-margin: 8px 0 18px;
-box-sizing: border-box;
-}
-button {
-background: #06c755;
-color: white;
-border: none;
-border-radius: 8px;
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>美食消費紀錄</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f7f5;
+      padding: 24px;
+      color: #24332b;
+    }
+    .container {
+      max-width: 420px;
+      margin: 30px auto;
+      background: white;
+      padding: 24px;
+      border-radius: 16px;
+      box-shadow: 0 4px 18px rgba(0,0,0,.06);
+    }
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0 18px;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+    input {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    button {
+      background: #06c755;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+    .history-button {
+      background: #247c58;
+    }
+    .summary {
+      background: #edf9f1;
+      border-radius: 10px;
+      padding: 15px;
+      margin: 15px 0;
+      line-height: 1.8;
+    }
+    .record {
+      border-bottom: 1px solid #eee;
+      padding: 12px 0;
+    }
+    .record-name {
+      font-weight: bold;
+    }
+    .record-detail {
+      color: #666;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+    #historySection {
+      display: none;
+    }
+    #result, #historyStatus {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+  </style>
 </head>
+
 <body>
 <div class="container">
-<h2>🍜 美食消費紀錄</h2>
-<p>記錄今天吃了什麼！</p>
+  <h2>🍜 美食消費紀錄</h2>
+  <p>記錄今天吃了什麼！</p>
 
-<form id="mealForm">
-<label>餐廳名稱</label>
-<input type="text" name="restaurant"
-placeholder="例如：麥食堂" required>
+  <form id="mealForm">
+    <label>餐廳名稱</label>
+    <input
+      type="text"
+      name="restaurant"
+      placeholder="例如：麥食堂"
+      required
+    >
 
-<label>消費金額（元）</label>
-<input type="number" name="amount"
-min="1" placeholder="例如：150" required>
+    <label>消費金額（元）</label>
+    <input
+      type="number"
+      name="amount"
+      min="1"
+      step="1"
+      placeholder="例如：150"
+      required
+    >
 
-<label>用餐日期</label>
-<input type="date" name="mealDate" required>
+    <label>用餐日期</label>
+    <input type="date" name="mealDate" required>
 
-<button type="submit" id="submitBtn">儲存消費紀錄</button>
-</form>
+    <button type="submit" id="submitBtn">
+      儲存消費紀錄
+    </button>
+  </form>
 
-<p id="result"></p>
+  <p id="result" role="status"></p>
+
+  <hr>
+
+  <h2>📒 我的美食帳本</h2>
+
+  <button
+    type="button"
+    id="historyBtn"
+    class="history-button"
+  >
+    查看我的消費紀錄
+  </button>
+
+  <p id="historyStatus" role="status"></p>
+
+  <div id="historySection">
+    <div class="summary">
+      <div id="totalAmount"></div>
+      <div id="totalCount"></div>
+    </div>
+
+    <h3>消費明細</h3>
+    <div id="recordList"></div>
+  </div>
 </div>
 
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-<script>
-const webhookUrl =
-  "https://zoe36875.app.n8n.cloud/webhook/meal-record";
-  async function initLiff() {
-  try {
-    await liff.init({
-      liffId: "2012195207-0B05X0PU"
-    });
 
-    if (!liff.isLoggedIn()) {
-      liff.login();
-      return;
+<script>
+  // 原本已經成功的正式記帳網址
+  const webhookUrl =
+    "https://zoe36875.app.n8n.cloud/webhook/meal-record";
+
+  // 新增的消費紀錄查詢網址
+  const historyUrl =
+    "https://zoe36875.app.n8n.cloud/webhook/meal-history";
+
+  // 沿用原本的 LINE LIFF ID
+  const LIFF_ID = "2012195207-0B05X0PU";
+
+  const form = document.getElementById("mealForm");
+  const result = document.getElementById("result");
+  const submitBtn = document.getElementById("submitBtn");
+  const historyBtn = document.getElementById("historyBtn");
+  const historyStatus =
+    document.getElementById("historyStatus");
+  const historySection =
+    document.getElementById("historySection");
+
+  // 初始化 LINE，只需要一次
+  const liffReady = initLiff();
+
+  async function initLiff() {
+    try {
+      await liff.init({ liffId: LIFF_ID });
+
+      if (!liff.isLoggedIn()) {
+        liff.login();
+        return false;
+      }
+
+      console.log("LIFF 登入成功");
+      return true;
+    } catch (error) {
+      console.error("LIFF 初始化失敗", error);
+      result.textContent = "LINE 初始化失敗，請重新開啟頁面。";
+      return false;
+    }
+  }
+
+  // 取得 LINE ID Token
+  async function getLineIdToken() {
+    const ready = await liffReady;
+
+    if (!ready || !liff.isLoggedIn()) {
+      throw new Error("請先登入 LINE");
     }
 
-    console.log("LIFF 登入成功");
-  } catch (error) {
-    console.error("LIFF 初始化失敗", error);
-  }
-}
+    const idToken = liff.getIDToken();
 
-initLiff();
-function getLineIdToken() {
-  if (!liff.isLoggedIn()) {
-    throw new Error("請先登入 LINE");
+    if (!idToken) {
+      throw new Error("無法取得 LINE 身分權杖");
+    }
+
+    return idToken;
   }
 
-  const idToken = liff.getIDToken();
-
-  if (!idToken) {
-    throw new Error("無法取得 LINE 身分權杖");
-  }
-
-  return idToken;
-}
-document.getElementById("mealForm")
-  .addEventListener("submit", async function(e) {
+  // 儲存消費紀錄
+  form.addEventListener("submit", async function(e) {
     e.preventDefault();
 
-    const form = e.target;
-    const result = document.getElementById("result");
-
-   const data = {
-  restaurant: form.restaurant.value,
-  amount: Number(form.amount.value),
-  mealDate: form.mealDate.value,
-  idToken: getLineIdToken()
-};
-
-    result.textContent = "正在傳送資料...";
-    const submitBtn = document.getElementById("submitBtn");
-submitBtn.disabled = true;
+    submitBtn.disabled = true;
+    result.textContent = "正在儲存消費紀錄...";
 
     try {
+      const idToken = await getLineIdToken();
+
+      const data = {
+        restaurant: form.elements["restaurant"].value.trim(),
+        amount: Number(form.elements["amount"].value),
+        mealDate: form.elements["mealDate"].value,
+        idToken: idToken
+      };
+
+      if (!data.restaurant ||
+          !Number.isInteger(data.amount) ||
+          data.amount <= 0 ||
+          !data.mealDate) {
+        throw new Error("請確認餐廳、金額與日期");
+      }
+
       const response = await fetch(webhookUrl, {
         method: "POST",
         headers: {
@@ -121,17 +230,135 @@ submitBtn.disabled = true;
         throw new Error("HTTP " + response.status);
       }
 
-      result.textContent = "資料已送出！";
+      const responseData = await response.json();
+
+      if (responseData.success !== true) {
+        throw new Error(
+          responseData.message || "儲存失敗"
+        );
+      }
+
+      result.textContent = "✅ 消費紀錄儲存成功！";
+
+      // 儲存成功後清空餐廳及金額
+      form.elements["restaurant"].value = "";
+      form.elements["amount"].value = "";
+
+      // 下次查詢時重新取得最新資料
+      historySection.style.display = "none";
+      historyStatus.textContent = "";
+
     } catch (error) {
-  result.textContent =
-    "傳送失敗：" + error.message;
-} finally {
-  submitBtn.disabled = false;
-}
+      result.textContent =
+        "❌ 儲存失敗：" + error.message;
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  // 查看我的消費紀錄
+  historyBtn.addEventListener("click", async function() {
+    historyBtn.disabled = true;
+    historySection.style.display = "none";
+    historyStatus.textContent = "正在查詢消費紀錄...";
+
+    try {
+      const idToken = await getLineIdToken();
+
+      // 與記帳流程一樣，用 text/plain 傳送
+      // 因為 n8n Webhook 目前用 JSON.parse 讀取 body
+      const response = await fetch(historyUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain"
+        },
+        body: JSON.stringify({
+          idToken: idToken
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error("HTTP " + response.status);
+      }
+
+      const data = await response.json();
+
+      if (data.success !== true) {
+        throw new Error(
+          data.message || "查詢失敗"
+        );
+      }
+
+      if (!Array.isArray(data.records)) {
+        throw new Error("查詢結果格式不正確");
+      }
+
+      const records = data.records;
+
+      // 計算總消費金額
+      const total = records.reduce(function(sum, record) {
+        return sum + Number(record.amount || 0);
+      }, 0);
+
+      document.getElementById("totalAmount")
+        .textContent =
+        "💰 累計消費：NT$ " +
+        total.toLocaleString("zh-TW");
+
+      document.getElementById("totalCount")
+        .textContent =
+        "🍽️ 消費次數：" + records.length + " 次";
+
+      const recordList =
+        document.getElementById("recordList");
+
+      recordList.replaceChildren();
+
+      // 依日期由新到舊排列
+      records.sort(function(a, b) {
+        return String(b.date || "")
+          .localeCompare(String(a.date || ""));
+      });
+
+      if (records.length === 0) {
+        const empty = document.createElement("p");
+        empty.textContent = "目前還沒有消費紀錄。";
+        recordList.appendChild(empty);
+      }
+
+      records.forEach(function(record) {
+        const item = document.createElement("div");
+        item.className = "record";
+
+        const name = document.createElement("div");
+        name.className = "record-name";
+        name.textContent =
+          "🍜 " + (record.restaurant || "未命名餐廳");
+
+        const detail = document.createElement("div");
+        detail.className = "record-detail";
+
+        const amount = Number(record.amount || 0);
+
+        detail.textContent =
+          "📅 " + (record.date || "未提供日期") +
+          "　💰 NT$ " + amount.toLocaleString("zh-TW");
+
+        item.appendChild(name);
+        item.appendChild(detail);
+        recordList.appendChild(item);
+      });
+
+      historySection.style.display = "block";
+      historyStatus.textContent = "✅ 查詢完成！";
+
+    } catch (error) {
+      historyStatus.textContent =
+        "❌ 查詢失敗：" + error.message;
+    } finally {
+      historyBtn.disabled = false;
+    }
   });
 </script>
-
 </body>
 </html>
-
-
